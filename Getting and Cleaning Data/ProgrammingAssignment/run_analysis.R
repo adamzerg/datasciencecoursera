@@ -89,8 +89,9 @@ row_labels = colnames(measurement[4:ncol(measurement)])
 normalize_measure = melt(measurement, id = column_labels, measure.vars = row_labels)
 tidy_data = dcast(normalize_measure, activity_id + activity + subject_id~ variable, mean)
 
+tidy_data_arrange <- tidy_data[c(3,2,4:ncol(tidy_data))]
+write.table(arrange(tidy_data_arrange, subject_id), file = "./tidy_data.txt", row.names = FALSE)
+
 #group_by(measurement, subject_id, activity)
 tidy_data2 <- ddply(measurement, column_labels, numcolwise(mean))
-
-write.table(tidy_data, file = "./tidy_data.txt", row.names = FALSE)
 write.table(tidy_data2, file = "./tidy_data2.txt", row.names = FALSE)
