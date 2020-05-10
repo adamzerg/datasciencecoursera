@@ -43,9 +43,9 @@ nrow(features)
 
 ## 4. Merge training and the test sets
 
-subject <- rbind(subject_train, subject_test)
-activity <- rbind(y_train, y_test)
-measurement <- rbind(X_train, X_test)
+measure_train <- cbind(subject_train, y_train, X_train)
+measure_test <- cbind(subject_test, y_test, X_test)
+measurement <- rbind(measure_train, measure_test)
 
 
 ## 5. Appropriately labels the data set with descriptive variable names
@@ -63,26 +63,23 @@ feature_label <- gsub("angle", "Angle", feature_label)
 feature_label <- gsub("gravity", "Gravity", feature_label)
 feature_label <- gsub(",|-|\\(|\\)", "", feature_label)
 
-colnames(measurement) <- feature_label
-colnames(subject) <- 'subject_id'
-colnames(activity) <- 'activity_id'
+colnames(measurement) <- c('subject_id','activity_id',feature_label)
 colnames(activity_labels) <- c('activity_id','activity')
 
 
 ## 6. Extracts only the measurements on the mean and standard deviation for each measurement
 
-measurement <- measurement[, grep("Mean|Std", colnames(measurement))]
+measurement <- measurement[, grep("subject_id|activity_id|Mean|Std", colnames(measurement))]
 colnames(measurement)
 
 
 ## 7. Uses descriptive activity names to name the activities in the data set
 
-activity <- merge(activity, activity_labels)
+measurement <- merge(activity_labels, measurement)
 nrow(subject)
 nrow(activity)
 nrow(measurement)
 
-measurement <- cbind(subject, activity, measurement)
 
 
 ## 8. Creates an independent tidy data set with the average of each variable for each activity and each subject
@@ -90,7 +87,7 @@ measurement <- cbind(subject, activity, measurement)
 column_labels = colnames(measurement[1:3])
 row_labels = colnames(measurement[4:ncol(measurement)])
 normalize_measure = melt(measurement, id = column_labels, measure.vars = row_labels)
-tidy_data = dcast(normalize_measure, subject_id + activity_id + activity ~ variable, mean)
+tidy_data = dcast(normalize_measure, activity_id + activity + subject_id~ variable, mean)
 
 #group_by(measurement, subject_id, activity)
 tidy_data2 <- ddply(measurement, column_labels, numcolwise(mean))

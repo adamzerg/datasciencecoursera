@@ -57,7 +57,7 @@ features
 Use nrow here to ensure number of rows are matched before the data mergence
 
 #### 4. Merge training and the test sets
-Use rbind to for data mergence of train vs test
+Use cbind and rbind for data mergence of train vs test
 
 #### 5. Appropriately labels the data set with descriptive variable names
 Extracting lables out from feature.txt, complete description for each variable
@@ -68,7 +68,7 @@ Assign for column names to each data set
 Look up column names in measurement, so only keep the measures of mean and std
 
 #### 7. Uses descriptive activity names to name the activities in the data set
-Read activity labels from txt before cbind the 3 data sets
+Read activity labels from txt to the combined data set
 
 #### 8. Creates an independent tidy data set with the average of each variable for each activity and each subject
 Use two methods here for aggregations: melt + dcast / ddply
