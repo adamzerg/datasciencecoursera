@@ -1,4 +1,6 @@
-
+#install.packages(c('R6', 'jsonlite'))
+#install.packages("vscDebugger")
+#library(vscDebugger)
 str(mpg)
 qplot(displ,hwy,data=mpg,color=drv,geom=c("point","smooth")) 
 qplot(drv,hwy,data=mpg,geom="boxplot",color=manufacturer) 
