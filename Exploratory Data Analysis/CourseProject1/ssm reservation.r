@@ -1,8 +1,11 @@
 install.packages("tidyverse")
 install.packages("dplyr")
-library(dplyr)
-library(readxl)
 #libraryq(xlsx)
+library(readxl)
+library(dplyr)
+library(reshape)
+library(ggplot2)
+
 
 download.file('https://www.ssm.gov.mo/docs/stat/apt/RNA010.xlsx', 'RNA010.xlsx', method='curl' )
 rdf <- read_excel("RNA010.xlsx", sheet="20210804", na = "---")
@@ -28,4 +31,8 @@ dfm <- melt(data, id = c("ReservationDateTime", "ReservationDate", "ReservationT
 
 g <- ggplot(dfm, aes(ReservationTime,value,colour = ReservationDate))
 g + geom_point() + facet_wrap(~variable, nrow = 6, ncol = 7)
+
+g <- ggplot(dfm, aes(y=value,colour = ReservationDate))
+g + geom_boxplot() + facet_wrap(~variable, nrow = 6, ncol = 7)
+
 
