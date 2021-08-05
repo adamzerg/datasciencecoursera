@@ -34,13 +34,13 @@ dfm <- melt(data, id = c("ReservationDateTime", "ReservationDate", "ReservationT
 
 
 # View by 24 hours
-png(file="SSM-hr.png", width = 1920, height = 1080)
+png(file="SSM-hr.png", width = 2231, height = 971)
 g <- ggplot(dfm, aes(ReservationTime,value,colour = ReservationDate))
 g + geom_point() + facet_wrap(~variable, nrow = 6, ncol = 7)
 dev.off()
 
 # View by days
-png(file="SSM-day.png", width = 1920, height = 1080)
+png(file="SSM-day.png", width = 2231, height = 971)
 g <- ggplot(dfm, aes(y=value,colour = ReservationDate))
 g + geom_boxplot() + facet_wrap(~variable, nrow = 6, ncol = 7)
 dev.off()
