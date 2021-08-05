@@ -5,7 +5,10 @@ library(readxl)
 library(dplyr)
 library(reshape)
 library(ggplot2)
-
+install.packages("vscDebugger")
+library(vscDebugger)
+install.packages(c('R6', 'jsonlite'))
+install.packages(c('vscDebugger'))
 
 download.file('https://www.ssm.gov.mo/docs/stat/apt/RNA010.xlsx', 'RNA010.xlsx', method='curl' )
 rdf <- read_excel("RNA010.xlsx", sheet="20210804", na = "---")
@@ -29,12 +32,16 @@ dfm <- melt(data, id = c("ReservationDateTime", "ReservationDate", "ReservationT
 #dfm[is.na(dfm)] <- 0
 #dfn <- filter(dfm, variable == "澳門大學", value < quantile(dfm$value, 0.90, na.rm=TRUE))
 
+
 # View by 24 hours
+png(file="SSM-hr.png", width = 1920, height = 1080)
 g <- ggplot(dfm, aes(ReservationTime,value,colour = ReservationDate))
 g + geom_point() + facet_wrap(~variable, nrow = 6, ncol = 7)
+dev.off()
 
 # View by days
+png(file="SSM-day.png", width = 1920, height = 1080)
 g <- ggplot(dfm, aes(y=value,colour = ReservationDate))
 g + geom_boxplot() + facet_wrap(~variable, nrow = 6, ncol = 7)
-
+dev.off()
 
