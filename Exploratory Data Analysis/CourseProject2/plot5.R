@@ -54,5 +54,5 @@ g2 <- ggplot(NEI[NEI$SCC %in% dff$SCC & NEI$fips == "24510", ], aes(x = factor(y
   facet_wrap(~type, nrow = 1, ncol = 4) +
   xlab("Year") + ylab("Log10 of PM2.5")
 
-grid.arrange(g1, g2, nrow = 1, top = "PM2.5 emissions to motor vehicle")
+grid.arrange(g1, g2, nrow = 1, top = "PM2.5 emissions to motor vehicle in Baltimore City")
 dev.off()
