@@ -56,6 +56,7 @@ state_tbl <- read_csv("state.csv", col_name = TRUE)
 # because there ware more words begining with "thu" and only two cases to ignore if use "thun"
 
 # storm %>% count(EVTYPE) %>% arrange(EVTYPE) %>% as.data.frame()
+# storm %>% filter(as_date(BGN_DATE, format = "%m/%d/%Y") >= "1999-01-01") %>% mutate(EVTitle = str_to_title(EVTYPE)) %>% count(EVTitle) %>% arrange(EVTitle) %>% as.data.frame()
 
 storm_event <- storm %>%
 filter(!str_detect(EVTYPE, "SUMMARY.*") & !str_detect(EVTYPE, "Summary.*")) %>%
@@ -170,6 +171,7 @@ mutate(CropDmgAmt =
             ) %>%
 mutate(TotalDmgAmt = PropDmgAmt + CropDmgAmt)
 
+
 #summary(df)
 #filter(df, PROPDMGEXP == "5") %>% top_n(5)
 str(df)
@@ -270,6 +272,7 @@ p5ll <- merge(p5s, lonlat)
 str(p5ll)
 
 p5ll %>% arrange(BgnYear)
+df %>% filter(BgnYear == 2006 & STATE == "CA") %>% slice_max(TotalDmgAmt)
 
 p5 <- ggmap(get_map(location = "USA", zoom = 4), darken = .3, 
 base_layer = ggplot(data = p5ll, aes(x = lon, y = lat, frame = BgnYear, ids = STATE))) +

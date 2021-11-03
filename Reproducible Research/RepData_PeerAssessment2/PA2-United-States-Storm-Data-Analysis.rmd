@@ -1,5 +1,5 @@
 ---
-title: "United States Storm Date Analysis 1950 - 2011"
+title: "United States Storm Data Analysis 1950 - 2011: tornado caused most injuries and flood caused most damages"
 date: "`r Sys.Date()`"
 output: 
   html_document:
@@ -17,9 +17,9 @@ After exploring for the data over years, we noted tornado caused most injuries a
 
 ### 1.1 Load library and settings
 
-Preload of packages in used, mainly from [Tidyverse](https://www.tidyverse.org/packages/) and [Plotly ggplot2](https://plotly.com/ggplot2/)
+Preload of packages we need. mainly from [Tidyverse](https://www.tidyverse.org/packages/) and [Plotly ggplot2](https://plotly.com/ggplot2/)
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(R.utils)
 library(readr)
@@ -44,13 +44,15 @@ ggmap_hide_api_key()
 
 ### 1.2 Data ingestion
 
-The data for this project come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. Aside of this we added event tibble for better mapping of all the events appears in the data, and states abbreviations for mapping of the geo locations.
+The data for this project come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. Aside of this we added event tibble for better mapping of all the events appears in the data, and states abbreviations for mapping of the geolocations.
 
 1. Storm data, direct [download](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) and unzipped from bz2 to csv
-2. Event table contains of 48 event types, pulled from the [Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+2. Event table contains of 48 event types, pulled from the National Weather Service [Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
 3. States from United States official [abbreviations](https://www.infoplease.com/us/postal-information/state-abbreviations-and-state-postal-codes)
 
-```{r ingest-dataset, message=FALSE}
+```{r ingest-dataset, warning=FALSE, message=FALSE}
+download.file('https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2', 'storm.csv.bz2', method='curl' )
+bunzip2(filename="storm.csv.bz2", "storm.csv")
 storm <- read_csv("storm.csv", col_name = TRUE)
 evnt_tbl <- read_csv("storm-data-event-table.csv", col_name = TRUE)
 state_tbl <- read_csv("state.csv", col_name = TRUE)
@@ -58,25 +60,26 @@ state_tbl <- read_csv("state.csv", col_name = TRUE)
 
 ### 1.3 Prepare event types
 
-When profiling data, we immediataly found that EVTYPE is the descriptive keword but there are 977 distinct values. Most of them are dirty due to several reasons:
+When profiling data, we immediataly found that EVTYPE is the descriptive keword we need to base, but there are 977 distinct values.
+Most of them are dirty and need for clean up due to several reasons:
 
 1. Aggregated result are found. e.g. "SUMMARY OF MARCH 24-25", "Summary of May 9-10"
 2. Some measurement numbers like speed and probably height is recorded following after the event name e.g. "THUNDERSTORM WIND 65MPH", "HIGH WIND 70"
 3. Incorrect spelling e.g. "THUNDEERSTORM WINDS", "THUNERSTORM WINDS"
-4. More than one event may be listed togather e.g. "DROUGHT/EXCESSIVE HEAT", "HIGH WINDS/FLOODING"
+4. More than one event may be listed together e.g. "DROUGHT/EXCESSIVE HEAT", "HIGH WINDS/FLOODING"
 5. Some word is too common and can be appear in several events e.g. "wind" in "High Wind", "Strong Wind", "Marine High Wind", "Thunderstorm Wind"
 
-To solve this, we created a new event column so 
-- The unwanted row and words are cleared away
-- Use precised keword to correct event name
-    For example, "^thun.*" is in used for correction of THUNDEERSTORM WINDS / THUNERSTORM WINDS but not for TUNDERSTORM WIND / THUDERSTORM WINDS
-- Correct most event with starting keywords
-    As if two event appears we consider the one appear first
-- Take extra care for ending keywords
-    We meant not to overlapped the result being corrected ready by starting keywords
-- Assumptions are made here according to the 48 type of events listed in the documentation
-    For example, Landslide / Landslump / Mudslide are correted as "Debris Flow"
-    "Light Snow" is corrected as "Winter Weather" and so on..
+To solve this, we created a new event column so:  
+1. The unwanted row and words are clear away  
+2. Use precised keword to correct event name  
+    For example, "^thun.*" is in used for correction of THUNDEERSTORM WINDS / THUNERSTORM WINDS  
+3. Correct most event with starting keywords  
+    As if two event appears we consider the one appear first  
+4. Take extra care for ending keywords  
+    We meant not to overlapped the result being corrected ready by starting keywords  
+5. Assumptions are made here according to the 48 type of events listed in the documentation  
+    For example, Landslide / Landslump / Mudslide are correted as "Debris Flow"  
+    "Light Snow" is corrected as "Winter Weather" and so on..  
 
 ```{r prep-event, message=FALSE}
 storm_event <- storm %>%
@@ -147,7 +150,7 @@ mutate(Event = str_replace_all(Event, regex("^winter w.*"), "Winter Weather")) %
 mutate(Event = str_replace_all(Event, regex("^snow.*"), "Winter Weather")) %>%
 mutate(Event = str_replace_all(Event, regex("^light snow$"), "Winter Weather")) %>%
 mutate(Event = str_replace_all(Event, regex("^wint.*?mix"), "Winter Weather")) %>%
-# Collect events endding with specific words
+# Collect events ending with specific words
 mutate(Event = str_replace_all(Event, regex(".*drought$"), "Drought")) %>%
 mutate(Event = str_replace_all(Event, regex(".*dry$"), "Drought")) %>%
 mutate(Event = str_replace_all(Event, regex(".*flooding.*"), "Flood")) %>%
@@ -160,9 +163,9 @@ mutate(Event = str_to_title(Event)) %>%
 as.data.frame()
 ```
 
-For a preview of prepared data, we now see 
-- 977 EVTYPE is cleaned to 317 Events
-- all 48 event shows up
+For a preview of prepared data, we now see  
+- 977 EVTYPE is reduced to 317 Events with major event categorized ready  
+- all 48 event categorized and shows up  
 
 ```{r prep-event-check, message=FALSE}
 storm_event %>% count(Event, sort = TRUE) %>% tibble()
@@ -172,9 +175,14 @@ df %>% count(Event, sort = TRUE)
 
 ### 1.4 Prepare property and crop damage amounts
 
+While looking into economic consequences, we noted PROPDMG * PROPDMGEXP and CROPDMG * CROPDMGEXP are two pairs.  
+The EXP seems have stored the amount explanations like hundred, thousand, million and billion.  
+Therefore next transformation is just for monetary conversion.  
+For number 0-8, unfortunately there isn't much explanation we could find in the document, therefore they are treated as 1 to our result. i.e. no effects
+
 ```{r prep-dmg, message=FALSE}
-unique(df$CROPDMGEXP)
 unique(df$PROPDMGEXP)
+unique(df$CROPDMGEXP)
 
 df <- df %>%
 mutate(BgnDate = as_date(BGN_DATE, format = "%m/%d/%Y")) %>%
@@ -202,6 +210,9 @@ mutate(TotalDmgAmt = PropDmgAmt + CropDmgAmt)
 
 ### 2.1 Across the United States, which types of events are most harmful to population health?
 
+To have quick result first we select top 10 events out of 48, sorting by the injuries sum.  
+We see tornado has way more harms to population than the following rest 9 events.
+
 ```{r plot-pop-barplot, message=FALSE}
 df %>% count(STATE, sort = TRUE) %>% tibble()
 
@@ -219,7 +230,13 @@ geom_bar(position = "dodge", stat = "identity") + coord_flip() +
 theme_minimal()
 ```
 
-```{r plot-pop-treemap, message=FALSE}
+To explore in more detail, a tree map is plotted with 3 levels:  
+1. Designator C = County | Z - Zone | M - Marine
+2. All 48 events
+3. Number of injuries | fatalities
+Thus in each level, area represents their harmed population accordingly.
+
+```{r plot-pop-treemap, fig.show='hide', warning=FALSE, message=FALSE}
 p2s <- df %>%
     group_by(Designator, Event) %>%
     summarise(
@@ -240,14 +257,16 @@ p2 <- treemap(p2s,
               c("right", "bottom")
             )
           )
-
-d3tree2(p2, rootname = "United States 1950 - 2011 number of injuries and fatalities by event desinator (C - County | Z - Zone | M - Marine)")
+```
+```{r plot-pop-d3tree2, message=FALSE}
+d3tree2(p2, rootname = "United States 1950 - 2011 number of injuries and fatalities by event (C - County | Z - Zone | M - Marine)")
 ```
 
 
 
 ### 2.2 Across the United States, which types of events have the greatest economic consequences?
 
+For quick result top 10 events out of 48 shows, we can see flood and hurricane are the top 2 in damage to property wherease drought is the top 1 in damage to crop.
 ```{r plot-dmg-barplot, message=FALSE}
 p3 <- df %>%
     group_by(Event) %>%
@@ -263,7 +282,13 @@ geom_bar(position = "dodge", stat = "identity") + coord_flip() +
 theme_minimal()
 ```
 
-```{r plot-dmg-treemap, message=FALSE}
+Same again, a tree map is plotted with 3 levels:  
+1. Designator C = County | Z - Zone | M - Marine  
+2. All 48 events
+3. Damage to property | crops
+Thus in each level, area represents their damaged monetary amount.
+
+```{r plot-dmg-treemap, fig.show='hide', warning=FALSE, message=FALSE}
 p4s <- df %>%
     group_by(Designator, Event) %>%
     summarise(
@@ -284,14 +309,17 @@ p4 <- treemap(p4s,
               c("right", "bottom")
             )
           )
-
-d3tree2(p4, rootname = "United States 1950 - 2011 property and crop damage by event desinator (C - County | Z - Zone | M - Marine)")
+```
+```{r plot-dmg-d3tree2, message=FALSE}
+d3tree2(p4, rootname = "United States 1950 - 2011 property and crop damage by event (C - County | Z - Zone | M - Marine)")
 ```
 
 
 ### 2.3 Plot total damage to map across the United States
 
-The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+We noted the fact, events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+So in order to overview total damage occur over years to crossing the United States, we make a bubble plot to geolocation in US map, and let it be running over number years.
 
 ```{r group-dmg-map, message=FALSE}
 lonlat <- mutate_geocode(state_tbl, StateName)
@@ -306,6 +334,8 @@ p5s <- df %>%
 p5ll <- merge(p5s, lonlat) %>% arrange(BgnYear)
 ```
 
+During the time sequence is played, it is easy to spot the color in yellow (represented the highest damage) occurred in 2006, where over 115 billion damage is recorded in California by a biggest ever flood, below is its remark for further understandings.  
+
 ```{r plot-dmg-map, message=FALSE}
 p5 <- ggmap(get_map(location = "USA", zoom = 4), darken = .3, 
 base_layer = ggplot(data = p5ll, aes(x = lon, y = lat, frame = BgnYear, ids = STATE))) +
@@ -314,6 +344,22 @@ scale_size(range = c(4, 12)) +
 scale_color_viridis_c()
 
 ggplotly(p5)
+
+df %>% filter(BgnYear == 2006 & STATE == "CA") %>% slice_max(TotalDmgAmt)
 ```
 
 ## 3. SUMMARY
+
+In this project, we accomplished answering the two initial questions.
+Which types of events are most harmful to population health? - Tornado
+Which types of events have the greatest economic consequences? - Flood
+
+Not only that we also made a deep dive into time across geolocation, and found the biggest factor to our result typically lying under specific locaiton by specific time.
+
+Futher reading of the story, here is [Northern California Floods from NASA](https://earthobservatory.nasa.gov/images/15921/northern-california-floods)
+  
+  
+  
+  
+  
+.
