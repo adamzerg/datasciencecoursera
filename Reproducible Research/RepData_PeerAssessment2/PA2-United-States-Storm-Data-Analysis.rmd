@@ -1,0 +1,319 @@
+---
+title: "United States Storm Date Analysis 1950 - 2011"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    keep_md: true
+    css: ../bootstrap3/assets/css/bootstrap.min.css
+---
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+After exploring for the data over years, we noted tornado caused most injuries and fatalities, and flood caused most damange to property and crops. Steps below is to show how the analysis is processed.
+
+## 1. DATA PROCESSING
+
+### 1.1 Load library and settings
+
+Preload of packages in used, mainly from [Tidyverse](https://www.tidyverse.org/packages/) and [Plotly ggplot2](https://plotly.com/ggplot2/)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(R.utils)
+library(readr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(treemap)
+library(d3treeR)
+library(ggmap)
+library(plotly)
+library(GGally)
+```
+
+```{r map-api-key-setup, include=FALSE, message=FALSE, echo = FALSE}
+register_google(key = "AIzaSyD9z90fvzxmOhRzoNbxbwOmuIXI6CVKcTE")
+ggmap_hide_api_key()
+```
+
+### 1.2 Data ingestion
+
+The data for this project come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. Aside of this we added event tibble for better mapping of all the events appears in the data, and states abbreviations for mapping of the geo locations.
+
+1. Storm data, direct [download](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) and unzipped from bz2 to csv
+2. Event table contains of 48 event types, pulled from the [Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+3. States from United States official [abbreviations](https://www.infoplease.com/us/postal-information/state-abbreviations-and-state-postal-codes)
+
+```{r ingest-dataset, message=FALSE}
+storm <- read_csv("storm.csv", col_name = TRUE)
+evnt_tbl <- read_csv("storm-data-event-table.csv", col_name = TRUE)
+state_tbl <- read_csv("state.csv", col_name = TRUE)
+```
+
+### 1.3 Prepare event types
+
+When profiling data, we immediataly found that EVTYPE is the descriptive keword but there are 977 distinct values. Most of them are dirty due to several reasons:
+
+1. Aggregated result are found. e.g. "SUMMARY OF MARCH 24-25", "Summary of May 9-10"
+2. Some measurement numbers like speed and probably height is recorded following after the event name e.g. "THUNDERSTORM WIND 65MPH", "HIGH WIND 70"
+3. Incorrect spelling e.g. "THUNDEERSTORM WINDS", "THUNERSTORM WINDS"
+4. More than one event may be listed togather e.g. "DROUGHT/EXCESSIVE HEAT", "HIGH WINDS/FLOODING"
+5. Some word is too common and can be appear in several events e.g. "wind" in "High Wind", "Strong Wind", "Marine High Wind", "Thunderstorm Wind"
+
+To solve this, we created a new event column so 
+- The unwanted row and words are cleared away
+- Use precised keword to correct event name
+    For example, "^thun.*" is in used for correction of THUNDEERSTORM WINDS / THUNERSTORM WINDS but not for TUNDERSTORM WIND / THUDERSTORM WINDS
+- Correct most event with starting keywords
+    As if two event appears we consider the one appear first
+- Take extra care for ending keywords
+    We meant not to overlapped the result being corrected ready by starting keywords
+- Assumptions are made here according to the 48 type of events listed in the documentation
+    For example, Landslide / Landslump / Mudslide are correted as "Debris Flow"
+    "Light Snow" is corrected as "Winter Weather" and so on..
+
+```{r prep-event, message=FALSE}
+storm_event <- storm %>%
+# Summary should be filter away
+filter(!str_detect(EVTYPE, "SUMMARY.*") & !str_detect(EVTYPE, "Summary.*")) %>%
+# Build new column name it Event for data cleansing while orignal column EVTYPE is kept for reference
+mutate(Event = EVTYPE) %>%
+# Remove measures description to align the event name
+mutate(Event = str_replace_all(Event, "G[0-9].*", "")) %>%
+mutate(Event = str_replace_all(Event, "F[0-9].*", "")) %>%
+mutate(Event = str_replace_all(Event, "[0-9].*", "")) %>%
+mutate(Event = str_replace_all(Event, "\\(.*", "")) %>%
+mutate(Event = str_to_lower(Event)) %>%
+# Collect events starting with specific words
+mutate(Event = str_replace_all(Event, regex("^avalan.*"), "Avalanche")) %>%
+mutate(Event = str_replace_all(Event, regex("^blizzard.*"), "Blizzard")) %>%
+mutate(Event = str_replace_all(Event, regex("^coastal.*"), "Coastal Flood")) %>%
+mutate(Event = str_replace_all(Event, regex("^cold.*"), "Cold/Wind Chill")) %>%
+mutate(Event = str_replace_all(Event, regex("^record.*?cold.*"), "Cold/Wind Chill")) %>%
+mutate(Event = str_replace_all(Event, regex("^land.*"), "Debris Flow")) %>%
+mutate(Event = str_replace_all(Event, regex("^mudslide$"), "Debris Flow")) %>%
+mutate(Event = str_replace_all(Event, regex("^drought.*"), "Drought")) %>%
+mutate(Event = str_replace_all(Event, regex("^dry.*"), "Drought")) %>%
+mutate(Event = str_replace_all(Event, regex("^dust d.*"), "Dust Devil")) %>%
+mutate(Event = str_replace_all(Event, regex("^extreme.*?cold.*"), "Extreme Cold/Wind Chill")) %>%
+mutate(Event = str_replace_all(Event, regex("^ext.*?cold/windchill.*"), "Extreme Cold/Wind Chill")) %>%
+mutate(Event = str_replace_all(Event, regex("^extreme wind.*"), "Extreme Cold/Wind Chill")) %>%
+mutate(Event = str_replace_all(Event, regex("^flash flood.*"), "Flash Flood")) %>%
+mutate(Event = str_replace_all(Event, regex("^flood.*"), "Flood")) %>%
+mutate(Event = str_replace_all(Event, regex("^river flood$"), "Flood")) %>%
+mutate(Event = str_replace_all(Event, regex("^urban/small stream flood$"), "Flood")) %>%
+mutate(Event = str_replace_all(Event, regex("^freez.*"), "Frost/Freeze")) %>%
+mutate(Event = str_replace_all(Event, regex("^frost.*"), "Frost/Freeze")) %>%
+mutate(Event = str_replace_all(Event, regex("^fog.*"), "Freezing Fog")) %>%
+mutate(Event = str_replace_all(Event, regex("^funnel.*"), "Funnel Cloud")) %>%
+mutate(Event = str_replace_all(Event, regex("^hail.*"), "Hail")) %>%
+mutate(Event = str_replace_all(Event, regex("^small hail$"), "Hail")) %>%
+mutate(Event = str_replace_all(Event, regex("^extreme heat.*"), "Heat")) %>%
+mutate(Event = str_replace_all(Event, regex("^record.*?heat.*"), "Heat")) %>%
+mutate(Event = str_replace_all(Event, regex("^heat.*"), "Heat")) %>%
+mutate(Event = str_replace_all(Event, regex("^heavy rain.*"), "Heavy Rain")) %>%
+mutate(Event = str_replace_all(Event, regex("^heavy.*?snow.*"), "Heavy Snow")) %>%
+mutate(Event = str_replace_all(Event, regex("^excessive snow$"), "Heavy Snow")) %>%
+mutate(Event = str_replace_all(Event, regex("^high surf.*"), "High Surf")) %>%
+mutate(Event = str_replace_all(Event, regex("^high wind.*"), "High Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^wind.*"), "High Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^hurricane.*"), "Hurricane (Typhoon)")) %>%
+mutate(Event = str_replace_all(Event, regex("^typhoon.*"), "Hurricane (Typhoon)")) %>%
+mutate(Event = str_replace_all(Event, regex("^ice.*"), "Ice Storm")) %>%
+mutate(Event = str_replace_all(Event, regex("^lake.*?effect snow$"), "Lake-Effect Snow")) %>%
+mutate(Event = str_replace_all(Event, regex("^lightning.*"), "Lightning")) %>%
+mutate(Event = str_replace_all(Event, regex("^marine tstm.*"), "Marine Thunderstorm Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^rip current.*"), "Rip Current")) %>%
+mutate(Event = str_replace_all(Event, regex("^sleet.*"), "Sleet")) %>%
+mutate(Event = str_replace_all(Event, regex("^storm surge.*"), "Storm Surge/Tide")) %>%
+mutate(Event = str_replace_all(Event, regex("^strong high wind$"), "Strong Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^strong wind.*"), "Strong Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^thun.*"), "Thunderstorm Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^tstm.*"), "Thunderstorm Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^severe thunderstorms$"), "Thunderstorm Wind")) %>%
+mutate(Event = str_replace_all(Event, regex("^torn.*"), "Tornado")) %>%
+mutate(Event = str_replace_all(Event, regex("^tropical storm.*"), "Tropical Storm")) %>%
+mutate(Event = str_replace_all(Event, regex("^volcanic.*"), "Volcanic Ash")) %>%
+mutate(Event = str_replace_all(Event, regex("^water.*"), "Waterspout")) %>%
+mutate(Event = str_replace_all(Event, regex("^wild.*?fire.*"), "Wildfire")) %>%
+mutate(Event = str_replace_all(Event, regex("^winter s.*"), "Winter Storm")) %>%
+mutate(Event = str_replace_all(Event, regex("^winter w.*"), "Winter Weather")) %>%
+mutate(Event = str_replace_all(Event, regex("^snow.*"), "Winter Weather")) %>%
+mutate(Event = str_replace_all(Event, regex("^light snow$"), "Winter Weather")) %>%
+mutate(Event = str_replace_all(Event, regex("^wint.*?mix"), "Winter Weather")) %>%
+# Collect events endding with specific words
+mutate(Event = str_replace_all(Event, regex(".*drought$"), "Drought")) %>%
+mutate(Event = str_replace_all(Event, regex(".*dry$"), "Drought")) %>%
+mutate(Event = str_replace_all(Event, regex(".*flooding.*"), "Flood")) %>%
+mutate(Event = str_replace_all(Event, regex(".*fld.*"), "Flood")) %>%
+mutate(Event = str_replace_all(Event, regex(".*high surf$"), "High Surf")) %>%
+mutate(Event = str_replace_all(Event, regex(".*thunderstorm$"), "Thunderstorm Wind")) %>%
+mutate(Event = str_replace_all(Event, regex(".*winter storm$"), "Winter Storm")) %>%
+mutate(Event = str_replace_all(Event, regex(".*winter weather$"), "Winter Weather")) %>%
+mutate(Event = str_to_title(Event)) %>%
+as.data.frame()
+```
+
+For a preview of prepared data, we now see 
+- 977 EVTYPE is cleaned to 317 Events
+- all 48 event shows up
+
+```{r prep-event-check, message=FALSE}
+storm_event %>% count(Event, sort = TRUE) %>% tibble()
+df <- merge(evnt_tbl, storm_event)
+df %>% count(Event, sort = TRUE)
+```
+
+### 1.4 Prepare property and crop damage amounts
+
+```{r prep-dmg, message=FALSE}
+unique(df$CROPDMGEXP)
+unique(df$PROPDMGEXP)
+
+df <- df %>%
+mutate(BgnDate = as_date(BGN_DATE, format = "%m/%d/%Y")) %>%
+mutate(EndDate = as_date(END_DATE, format = "%m/%d/%Y")) %>%
+mutate(BgnYear = year(BgnDate)) %>%
+mutate(EndYear = year(EndDate)) %>%
+mutate(PropDmgAmt =
+    case_when(PROPDMGEXP %in% c("H", "h") ~ PROPDMG * 10^2,
+            PROPDMGEXP %in% c("K", "k") ~ PROPDMG * 10^3,
+            PROPDMGEXP %in% c("M", "m") ~ PROPDMG * 10^6,
+            PROPDMGEXP %in% c("B", "b") ~ PROPDMG * 10^9,
+            TRUE ~ PROPDMG)
+            ) %>%
+mutate(CropDmgAmt =
+    case_when(CROPDMGEXP %in% c("H", "h") ~ CROPDMG * 10^2,
+            CROPDMGEXP %in% c("K", "k") ~ CROPDMG * 10^3,
+            CROPDMGEXP %in% c("M", "m") ~ CROPDMG * 10^6,
+            CROPDMGEXP %in% c("B", "b") ~ CROPDMG * 10^9,
+            TRUE ~ CROPDMG)
+            ) %>%
+mutate(TotalDmgAmt = PropDmgAmt + CropDmgAmt)
+```
+
+## 2. RESULT
+
+### 2.1 Across the United States, which types of events are most harmful to population health?
+
+```{r plot-pop-barplot, message=FALSE}
+df %>% count(STATE, sort = TRUE) %>% tibble()
+
+p1 <- df %>%
+    group_by(Event) %>%
+    summarise(
+            Fatalities.Sum = sum(FATALITIES, na.rm = TRUE),
+            Injuries.Sum = sum(INJURIES, na.rm = TRUE)
+    ) %>%
+    top_n(10) %>%
+    melt(id = "Event")
+    
+ggplot(data = p1, aes(x = reorder(Event, value), y = value, fill = variable)) +
+geom_bar(position = "dodge", stat = "identity") + coord_flip() +
+theme_minimal()
+```
+
+```{r plot-pop-treemap, message=FALSE}
+p2s <- df %>%
+    group_by(Designator, Event) %>%
+    summarise(
+            Fatalities.Sum = sum(FATALITIES, na.rm = TRUE),
+            Injuries.Sum = sum(INJURIES, na.rm = TRUE)
+    ) %>%
+    top_n(10) %>%
+    melt(id = c("Designator", "Event"))
+
+p2 <- treemap(p2s,
+            index = c("Designator", "Event", "variable"),
+            vSize = "value",
+            type = "index",
+            palette = "Set2",
+            bg.labels = c("white"),
+            align.labels = list(
+              c("center", "center"),
+              c("right", "bottom")
+            )
+          )
+
+d3tree2(p2, rootname = "United States 1950 - 2011 number of injuries and fatalities by event desinator (C - County | Z - Zone | M - Marine)")
+```
+
+
+
+### 2.2 Across the United States, which types of events have the greatest economic consequences?
+
+```{r plot-dmg-barplot, message=FALSE}
+p3 <- df %>%
+    group_by(Event) %>%
+    summarise(
+            PropDmgAmt.Sum = sum(PropDmgAmt, na.rm = TRUE),
+            CropDmgAmt.Sum = sum(CropDmgAmt, na.rm = TRUE)
+    ) %>%
+    top_n(10) %>%
+    melt(id = "Event")
+    
+ggplot(data = p3, aes(x = reorder(Event, value), y = value, fill = variable)) +
+geom_bar(position = "dodge", stat = "identity") + coord_flip() +
+theme_minimal()
+```
+
+```{r plot-dmg-treemap, message=FALSE}
+p4s <- df %>%
+    group_by(Designator, Event) %>%
+    summarise(
+            PropDmgAmt.Sum = sum(PropDmgAmt, na.rm = TRUE),
+            CropDmgAmt.Sum = sum(CropDmgAmt, na.rm = TRUE)
+    ) %>%
+    top_n(10) %>%
+    melt(id = c("Designator", "Event"))
+
+p4 <- treemap(p4s,
+            index = c("Designator", "Event", "variable"),
+            vSize = "value",
+            type = "index",
+            palette = "Set2",
+            bg.labels = c("white"),
+            align.labels = list(
+              c("center", "center"),
+              c("right", "bottom")
+            )
+          )
+
+d3tree2(p4, rootname = "United States 1950 - 2011 property and crop damage by event desinator (C - County | Z - Zone | M - Marine)")
+```
+
+
+### 2.3 Plot total damage to map across the United States
+
+The events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+```{r group-dmg-map, message=FALSE}
+lonlat <- mutate_geocode(state_tbl, StateName)
+
+p5s <- df %>%
+    group_by(STATE, BgnYear) %>%
+    summarise(
+            TotalDmgAmt.Sum = sum(TotalDmgAmt, na.rm = TRUE)
+    ) %>%
+    top_n(10)
+
+p5ll <- merge(p5s, lonlat) %>% arrange(BgnYear)
+```
+
+```{r plot-dmg-map, message=FALSE}
+p5 <- ggmap(get_map(location = "USA", zoom = 4), darken = .3, 
+base_layer = ggplot(data = p5ll, aes(x = lon, y = lat, frame = BgnYear, ids = STATE))) +
+geom_point(data = p5ll, aes(color = TotalDmgAmt.Sum, size = TotalDmgAmt.Sum, alpha = .7)) +
+scale_size(range = c(4, 12)) +
+scale_color_viridis_c()
+
+ggplotly(p5)
+```
+
+## 3. SUMMARY
