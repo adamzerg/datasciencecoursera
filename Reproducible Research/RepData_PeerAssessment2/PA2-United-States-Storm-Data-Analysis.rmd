@@ -66,7 +66,7 @@ state_tbl <- read_csv("state.csv", col_name = TRUE)
 
 ### 1.3 Prepare event types
 
-When profiling data, we immediataly found that EVTYPE is the descriptive keword we need to base, but there are 977 distinct values.
+When profiling data, we immediately found that EVTYPE is the descriptive keyword we need to base, but there are 977 distinct values.
 Most of them are dirty and need for clean up due to several reasons:
 
 1. Aggregated result are found. e.g. "SUMMARY OF MARCH 24-25", "Summary of May 9-10"
@@ -75,23 +75,19 @@ Most of them are dirty and need for clean up due to several reasons:
 4. More than one event may be listed together e.g. "DROUGHT/EXCESSIVE HEAT", "HIGH WINDS/FLOODING"
 5. Some word is too common and can be appear in several events e.g. "wind" in "High Wind", "Strong Wind", "Marine High Wind", "Thunderstorm Wind"
 
-To solve this, we created a new event column so:  
-1. The unwanted row and words are clear away  
-2. Use precised keword to correct event name  
-    For example, "^thun.*" is in used for correction of THUNDEERSTORM WINDS / THUNERSTORM WINDS  
-3. Correct most event with starting keywords  
-    As if two event appears we consider the one appear first  
-4. Take extra care for ending keywords  
-    We meant not to overlapped the result being corrected ready by starting keywords  
-5. Assumptions are made here according to the 48 type of events listed in the documentation  
-    For example, Landslide / Landslump / Mudslide are correted as "Debris Flow"  
-    "Light Snow" is corrected as "Winter Weather" and so on..  
+To solve this, we created a new event column so:
+
+1. The unwanted row and words are clear away
+2. Use precised keyword to correct event name e.g "^thun.*" is in used for correction of THUNDEERSTORM WINDS / THUNERSTORM WINDS
+3. Correct most event with starting keywords, as if two event appears we consider the one appear first
+4. Take extra care for ending keywords, it is meant not to overlapped the result being corrected ready by starting keywords
+5. Assumptions are made here according to the 48 type of events listed in the documentation e.g Landslide / Landslump / Mudslide are addressed as "Debris Flow", "Light Snow" is addressed as "Winter Weather"
 
 ```{r prep-event, message=FALSE}
 storm_event <- storm %>%
 # Summary should be filter away
 filter(!str_detect(EVTYPE, "SUMMARY.*") & !str_detect(EVTYPE, "Summary.*")) %>%
-# Build new column name it Event for data cleansing while orignal column EVTYPE is kept for reference
+# Build new column name it Event for data cleansing while original column EVTYPE is kept for reference
 mutate(Event = EVTYPE) %>%
 # Remove measures description to align the event name
 mutate(Event = str_replace_all(Event, "G[0-9].*", "")) %>%
@@ -325,33 +321,33 @@ d3tree2(p4, rootname = "United States 1950 - 2011 property and crop damage by ev
 
 We noted the fact, events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
 
-So in order to overview total damage occur over years to crossing the United States, we make a bubble plot to geolocation in US map, and let it be running over number years.
+So in order to overview total damage occur over years to crossing the United States, 80 top result are selected from all the states in each years. Then bubble plot representing the damage amount can be made to US map, run against the year timestamp.
 
 ```{r group-dmg-map, message=FALSE}
 lonlat <- mutate_geocode(state_tbl, StateName)
 
 p5s <- df %>%
-    group_by(STATE, BgnYear) %>%
-    summarise(
-            TotalDmgAmt.Sum = sum(TotalDmgAmt, na.rm = TRUE)
-    ) %>%
-    top_n(10)
+    group_by(BgnYear, STATE) %>%
+    slice(which.max(TotalDmgAmt)) %>%
+    ungroup() %>%
+    top_n(80)
 
-p5ll <- merge(p5s, lonlat) %>% arrange(BgnYear)
+p5ll <- merge(p5s, lonlat)
 ```
 
 During the time sequence is played, it is easy to spot the color in yellow (represented the highest damage) occurred in 2006, where over 115 billion damage is recorded in California by a biggest ever flood, below is its remark for further understandings.  
 
 ```{r plot-dmg-map, message=FALSE}
+
 p5 <- ggmap(get_map(location = "USA", zoom = 4), darken = .3, 
 base_layer = ggplot(data = p5ll, aes(x = lon, y = lat, frame = BgnYear, ids = STATE))) +
-geom_point(data = p5ll, aes(color = TotalDmgAmt.Sum, size = TotalDmgAmt.Sum, alpha = .7)) +
-scale_size(range = c(4, 12)) +
+geom_point(data = p5ll, aes(color = TotalDmgAmt, size = TotalDmgAmt, alpha = .7)) +
+scale_size(range = c(4, 14)) +
 scale_color_viridis_c()
 
 ggplotly(p5)
 
-df %>% filter(BgnYear == 2006 & STATE == "CA") %>% slice_max(TotalDmgAmt)
+p5ll %>% slice_max(TotalDmgAmt)
 ```
 
 ## 3. SUMMARY

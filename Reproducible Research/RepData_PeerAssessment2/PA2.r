@@ -260,26 +260,29 @@ d3tree2(p4, rootname = "United States 1950 - 2011 property and crop damage by ev
 
 lonlat <- mutate_geocode(state_tbl, StateName)
 
-p5s <- df %>%
-    group_by(STATE, BgnYear) %>%
-    summarise(
-            TotalDmgAmt.Sum = sum(TotalDmgAmt, na.rm = TRUE)
-    ) %>%
-    top_n(10)
+# p5s <- df %>% group_by(STATE, BgnYear) %>%
+#    summarise(
+#            TotalDmgAmt.Sum = sum(TotalDmgAmt, na.rm = TRUE)
+#    ) %>% top_n(10)
 
+p5s <- df %>%
+    group_by(BgnYear, STATE) %>%
+    slice(which.max(TotalDmgAmt)) %>%
+    ungroup() %>%
+    top_n(80)
+
+
+unique(p5s$Event)
 p5ll <- merge(p5s, lonlat)
 
-str(p5ll)
 
-p5ll %>% arrange(BgnYear)
-df %>% filter(BgnYear == 2006 & STATE == "CA") %>% slice_max(TotalDmgAmt)
+# p5ll %>% slice_max(TotalDmgAmt) %>% as.data.frame()
+
 
 p5 <- ggmap(get_map(location = "USA", zoom = 4), darken = .3, 
 base_layer = ggplot(data = p5ll, aes(x = lon, y = lat, frame = BgnYear, ids = STATE))) +
-geom_point(data = p5ll, aes(color = TotalDmgAmt.Sum, size = TotalDmgAmt.Sum, alpha = .7)) +
-scale_size(range = c(4, 12)) +
+geom_point(data = p5ll, aes(color = TotalDmgAmt, size = TotalDmgAmt, alpha = .7)) +
+scale_size(range = c(4, 14)) +
 scale_color_viridis_c()
 
 ggplotly(p5)
-
-
