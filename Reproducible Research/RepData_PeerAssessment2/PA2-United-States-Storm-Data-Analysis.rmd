@@ -1,5 +1,6 @@
 ---
 title: "United States Storm Data Analysis 1950 - 2011: tornado caused most injuries and flood caused most damages"
+author: Adam Zheng
 date: "`r Sys.Date()`"
 output: 
   html_document:
@@ -11,7 +12,10 @@ Storms and other severe weather events can cause both public health and economic
 
 This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
 
-After exploring for the data over years, we noted tornado caused most injuries and fatalities, and flood caused most damange to property and crops. Steps below is to show how the analysis is processed.
+There are two questions we need to carry in the analysis:  
+- Which types of events are most harmful to population health?  
+- Which types of events have the greatest economic consequences?  
+After exploring for the data over years, we noted tornado and flood are the answers, the steps below demostrate how the analysis is reproduced.
 
 ## 1. DATA PROCESSING
 
@@ -51,8 +55,10 @@ The data for this project come in the form of a comma-separated-value file compr
 3. States from United States official [abbreviations](https://www.infoplease.com/us/postal-information/state-abbreviations-and-state-postal-codes)
 
 ```{r ingest-dataset, warning=FALSE, message=FALSE}
+if (!file.exists("storm.csv")) {
 download.file('https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2', 'storm.csv.bz2', method='curl' )
 bunzip2(filename="storm.csv.bz2", "storm.csv")
+}
 storm <- read_csv("storm.csv", col_name = TRUE)
 evnt_tbl <- read_csv("storm-data-event-table.csv", col_name = TRUE)
 state_tbl <- read_csv("state.csv", col_name = TRUE)
